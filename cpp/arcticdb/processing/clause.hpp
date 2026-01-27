@@ -900,6 +900,12 @@ struct MergeUpdateClause {
             const TimestampRange& target_atom_key_range
     ) const;
 
+    std::vector<std::vector<size_t>> filter_on_additional_columns_match(
+            const StreamDescriptor& source_descriptor, const StreamDescriptor& target_descriptor,
+            const std::span<const NativeTensor> source_tensors, const ProcessingUnit& proc,
+            std::vector<std::vector<size_t>>&& index_match
+    ) const;
+
     /// For each timestamp range stores the first and last row in the source that overlaps with the row range. The
     /// interval is closed in the start and open in the end: [start, end)
     ankerl::unordered_dense::map<TimestampRange, std::pair<size_t, size_t>, folly::hasher<TimestampRange>>

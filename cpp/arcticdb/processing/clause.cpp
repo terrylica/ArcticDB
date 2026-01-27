@@ -1948,6 +1948,12 @@ std::vector<EntityId> MergeUpdateClause::process(std::vector<EntityId>&& entity_
             std::span(index_tensor.data(), source_->num_rows),
             proc.atom_keys_->front()->time_range()
     );
+    if (!on_.empty()) {
+        // TODO: Source and target descriptor can differ for dynamic schema
+        matched = filter_on_additional_columns_match(
+                source_->desc(), source_->desc(), source_->field_tensors(), proc, std::move(matched)
+        );
+    }
     if (source_->has_segment()) {
         user_input::raise<ErrorCode::E_INVALID_USER_ARGUMENT>(
                 "Arrow format is not supported yes as input for merge update"
@@ -2104,6 +2110,89 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_index_match(
         source_row++;
     }
     return matched_rows;
+}
+
+std::vector<std::vector<size_t>> MergeUpdateClause::filter_on_additional_columns_match(
+        const StreamDescriptor& source_descriptor, const StreamDescriptor& target_descriptor,
+        const std::span<const NativeTensor> source_tensors, const ProcessingUnit& proc,
+        std::vector<std::vector<size_t>>&& index_match
+) const {
+    const std::span<const std::shared_ptr<SegmentInMemory>> target_segments = *proc.segments_;
+    const std::span<const std::shared_ptr<RowRange>> row_ranges = *proc.row_ranges_;
+    const std::span<const std::shared_ptr<ColRange>> col_ranges = *proc.col_ranges_;
+    const auto [source_row_start, source_row_end] = source_start_end_for_row_range_.at(*row_ranges[0]);
+    std::optional<ScopedGILLock> scoped_gil_lock;
+    for (std::string_view column_name : on_) {
+        const std::optional<size_t> source_field_position = source_descriptor.find_field(column_name);
+        user_input::check<ErrorCode::E_INVALID_USER_ARGUMENT>(
+                source_field_position.has_value(), "Column {} does not exist in source", column_name
+        );
+        const Field& field = source_descriptor.field(*source_field_position);
+        visit_field(field, [&](auto source_tdt) {
+            using SourceTDT = decltype(source_tdt);
+            using SourceType = std::conditional_t<
+                    is_sequence_type(source_tdt.data_type()),
+                    PyObject* const*,
+                    const typename SourceTDT::DataTypeTag::raw_type*>;
+            const size_t column_position_in_source_tensors =
+                    *source_field_position - source_descriptor.index().field_count();
+            std::span source_data(
+                    static_cast<SourceType>(source_tensors[column_position_in_source_tensors].data()) +
+                            source_row_start,
+                    source_row_end - source_row_start
+            );
+            // TODO: Dynamic schema will require the following lookup in target instead of using the index in source
+            //  descriptor: const std::optional<size_t> target_field_position = target_descriptor.find_field(column);
+            const size_t target_field_position = *source_field_position;
+            const auto target_column_slice = ranges::find_if(col_ranges, [&](const std::shared_ptr<ColRange>& cr) {
+                return cr->contains(target_field_position);
+            });
+            const size_t position_in_slice = target_field_position - (*target_column_slice)->first;
+            const SegmentInMemory& target_segment = *target_segments[target_column_slice - col_ranges.begin()];
+            ColumnData target_data = target_segment.column(position_in_slice).data();
+            const Field& target_field = target_descriptor.field(target_field_position);
+            visit_field(target_field, [&](auto target_tdt) {
+                using TargetTDT = decltype(target_tdt);
+                using TargetRawType = TargetTDT::DataTypeTag::raw_type;
+                // TODO: Relax for dynamic schema
+                if constexpr (std::same_as<SourceTDT, TargetTDT> && SourceTDT::dimension() == Dimension::Dim0) {
+                    auto target_accessor = random_accessor<TargetTDT>(&target_data);
+                    for (size_t source_row_idx = 0; source_row_idx < index_match.size(); ++source_row_idx) {
+                        ranges::remove_if(index_match[source_row_idx], [&](const size_t target_row_idx) {
+                            const TargetRawType target_value = target_accessor.at(target_row_idx);
+                            if constexpr (is_sequence_type(source_tdt.data_type())) {
+                                static_assert(is_sequence_type(target_tdt.data_type()));
+                                auto py_string_object = source_data[source_row_idx];
+                                if (is_py_none(py_string_object)) {
+                                    return not_a_string() != target_value;
+                                } else if (is_py_nan(py_string_object)) {
+                                    return nan_placeholder() != target_value;
+                                } else {
+                                    std::variant<convert::StringEncodingError, convert::PyStringWrapper>
+                                            wrapper_or_error =
+                                                    create_py_object_wrapper_or_error<target_tdt.data_type()>(
+                                                            py_string_object, scoped_gil_lock
+                                                    );
+                                    if (auto* err = std::get_if<convert::StringEncodingError>(&wrapper_or_error); err) {
+                                        err->row_index_in_slice_ = row_ranges[0]->start() + source_row_idx;
+                                        err->raise(column_name, row_ranges[0]->start());
+                                    } else {
+                                        const auto& wrapper = std::get<convert::PyStringWrapper>(wrapper_or_error);
+                                        return target_segment.string_at_offset(target_value) !=
+                                               std::string_view(wrapper.buffer_, wrapper.length_);
+                                    }
+                                }
+                            } else {
+                                return source_data[source_row_idx] != target_value;
+                            }
+                            return false;
+                        });
+                    }
+                }
+            });
+        });
+    }
+    return index_match;
 }
 
 const ClauseInfo& MergeUpdateClause::clause_info() const { return clause_info_; }
