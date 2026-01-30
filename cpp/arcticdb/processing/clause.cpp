@@ -2120,7 +2120,12 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_on_additional_columns
     const std::span<const std::shared_ptr<SegmentInMemory>> target_segments = *proc.segments_;
     const std::span<const std::shared_ptr<RowRange>> row_ranges = *proc.row_ranges_;
     const std::span<const std::shared_ptr<ColRange>> col_ranges = *proc.col_ranges_;
-    const auto [source_row_start, source_row_end] = source_start_end_for_row_range_.at(*row_ranges[0]);
+    const std::span<const std::shared_ptr<AtomKey>> atom_keys = *proc.atom_keys_;
+    const auto [source_row_start, source_row_end] = source_start_end_for_row_range_.at(atom_keys[0]->time_range());
+    // GIL will be acquired if there is a string that is not pure ASCII/UTF-8
+    // In this case a PyObject will be allocated by convert::py_unicode_to_buffer
+    // If such a string is encountered in a column, then the GIL will be held until that whole column has
+    // been processed, on the assumption that if a column has one such string it will probably have many.
     std::optional<ScopedGILLock> scoped_gil_lock;
     for (std::string_view column_name : on_) {
         const std::optional<size_t> source_field_position = source_descriptor.find_field(column_name);
@@ -2143,14 +2148,19 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_on_additional_columns
             );
             // TODO: Dynamic schema will require the following lookup in target instead of using the index in source
             //  descriptor: const std::optional<size_t> target_field_position = target_descriptor.find_field(column);
-            const size_t target_field_position = *source_field_position;
-            const auto target_column_slice = ranges::find_if(col_ranges, [&](const std::shared_ptr<ColRange>& cr) {
-                return cr->contains(target_field_position);
-            });
-            const size_t position_in_slice = target_field_position - (*target_column_slice)->first;
+            const std::optional<size_t> target_field_position = source_field_position;
+            user_input::check<ErrorCode::E_INVALID_USER_ARGUMENT>(
+                    target_field_position.has_value(), "Column {} does not exist in target", column_name
+            );
+            const auto target_column_slice =
+                    ranges::find_if(col_ranges, [&](const std::shared_ptr<ColRange>& col_range) {
+                        return col_range->contains(*target_field_position);
+                    });
+            const size_t position_in_slice =
+                    *target_field_position - (*target_column_slice)->first + target_descriptor.index().field_count();
             const SegmentInMemory& target_segment = *target_segments[target_column_slice - col_ranges.begin()];
             ColumnData target_data = target_segment.column(position_in_slice).data();
-            const Field& target_field = target_descriptor.field(target_field_position);
+            const Field& target_field = target_descriptor.field(*target_field_position);
             visit_field(target_field, [&](auto target_tdt) {
                 using TargetTDT = decltype(target_tdt);
                 using TargetRawType = TargetTDT::DataTypeTag::raw_type;
@@ -2158,7 +2168,7 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_on_additional_columns
                 if constexpr (std::same_as<SourceTDT, TargetTDT> && SourceTDT::dimension() == Dimension::Dim0) {
                     auto target_accessor = random_accessor<TargetTDT>(&target_data);
                     for (size_t source_row_idx = 0; source_row_idx < index_match.size(); ++source_row_idx) {
-                        ranges::remove_if(index_match[source_row_idx], [&](const size_t target_row_idx) {
+                        std::erase_if(index_match[source_row_idx], [&](const size_t target_row_idx) {
                             const TargetRawType target_value = target_accessor.at(target_row_idx);
                             if constexpr (is_sequence_type(source_tdt.data_type())) {
                                 static_assert(is_sequence_type(target_tdt.data_type()));
@@ -2188,6 +2198,10 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_on_additional_columns
                             return false;
                         });
                     }
+                } else {
+                    internal::raise<ErrorCode::E_ASSERTION_FAILURE>(
+                            "Target column \"{}\" has unexpected type", column_name, target_field.name()
+                    );
                 }
             });
         });

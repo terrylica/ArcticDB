@@ -1341,6 +1341,7 @@ def merge_update(
     # If "on" is an empty match on the index. Otherwise, create a multiindex which includes the DatetimeIndex (if any)
     # and the columns listed in "on". Using the a multiindex makes it easier to find which rows match using
     # DataFrame.loc
+    original_index = target.index.name
     if on is None:
         result = target.copy(deep=deep)
     else:
@@ -1371,6 +1372,7 @@ def merge_update(
         result.reset_index(level=on, inplace=True)
         result.index.name = target.index.name
     result = result[original_column_order]
+    result.index.name = original_index
     return result
 
 

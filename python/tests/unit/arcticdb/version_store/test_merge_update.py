@@ -291,7 +291,7 @@ class TestMergeTimeseriesUpdate:
         assert len(lt.find_keys_for_symbol(KeyType.TABLE_INDEX, "sym")) == 2
         assert len(lt.find_keys_for_symbol(KeyType.VERSION, "sym")) == 2
 
-    def test_on_index_and_column(self, lmdb_library, monkeypatch):
+    def test_on_index_and_column(self, lmdb_library):
         lib = lmdb_library
         target = pd.DataFrame({"a": [1, 2, 3], "b": [1.0, 2.0, 3.0]}, index=pd.date_range("2024-01-01", periods=3))
         lib.write("sym", target)
@@ -307,18 +307,13 @@ class TestMergeTimeseriesUpdate:
                 ]
             ),
         )
-        monkeypatch.setattr(lib.__class__, "merge_experimental", lambda *args, **kwargs: None, raising=False)
-        lib.merge_experimental(
-            "sym", source, on=["a"], strategy=MergeStrategy(not_matched_by_target=MergeAction.DO_NOTHING)
-        )
-
-        expected = pd.DataFrame({"a": [1, 2, 3], "b": [10.0, 2.0, 3.0]}, index=pd.date_range("2024-01-01", periods=3))
-        monkeypatch.setattr(lib, "read", lambda *args, **kwargs: VersionedItem("sym", "lib", expected, 2))
+        strategy = MergeStrategy(not_matched_by_target="do_nothing")
+        lib.merge_experimental("sym", source, on=["a"], strategy=strategy)
+        expected = merge(target, source, strategy, on=["a"], inplace=True)
         received = lib.read("sym").data
-
         assert_frame_equal(received, expected)
 
-    def test_multiple_columns(self, lmdb_library, monkeypatch):
+    def test_multiple_columns(self, lmdb_library):
         lib = lmdb_library
         target = pd.DataFrame(
             {
@@ -351,23 +346,9 @@ class TestMergeTimeseriesUpdate:
             ),
         )
 
-        monkeypatch.setattr(lib.__class__, "merge_experimental", lambda *args, **kwargs: None, raising=False)
-        lib.merge_experimental(
-            "sym", source, on=["b", "d", "e"], strategy=MergeStrategy(not_matched_by_target=MergeAction.DO_NOTHING)
-        )
-
-        expected = pd.DataFrame(
-            {
-                "a": [10, 2, 3, 4],
-                "b": ["a", "b", "c", "d"],
-                "c": ["A", "B", "A", "C"],
-                "d": [10.1, 20.2, 30.3, 40.4],
-                "e": [100, 200, 300, 400],
-            },
-            index=pd.date_range("2024-01-01", periods=4),
-        )
-
-        monkeypatch.setattr(lib, "read", lambda *args, **kwargs: VersionedItem("sym", "lib", expected, 2))
+        strategy = MergeStrategy(not_matched_by_target="do_nothing")
+        lib.merge_experimental("sym", source, on=["b", "d", "e"], strategy=strategy)
+        expected = merge(target, source, strategy, on=["b", "d", "e"], inplace=True)
         received = lib.read("sym").data
         assert_frame_equal(received, expected)
 
