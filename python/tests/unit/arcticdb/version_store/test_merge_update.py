@@ -208,7 +208,7 @@ class TestMergeTimeseriesUpdate:
         assert merge_vit.host == write_vit.host
         assert merge_vit.data is None
 
-        expected = merge(target, source, strategy, inplace=True)
+        expected = merge(target, source, strategy)
 
         read_vit = lib.read("sym")
         assert_vit_equals_except_data(merge_vit, read_vit)
@@ -267,7 +267,7 @@ class TestMergeTimeseriesUpdate:
         )
         strategy = MergeStrategy(not_matched_by_target=MergeAction.DO_NOTHING)
         lib.merge_experimental("sym", source, strategy=strategy)
-        expected = merge(target, source, strategy, inplace=True)
+        expected = merge(target, source, strategy)
 
         received = lib.read("sym").data
         assert_frame_equal(received, expected)
@@ -309,7 +309,7 @@ class TestMergeTimeseriesUpdate:
         )
         strategy = MergeStrategy(not_matched_by_target="do_nothing")
         lib.merge_experimental("sym", source, on=["a"], strategy=strategy)
-        expected = merge(target, source, strategy, on=["a"], inplace=True)
+        expected = merge(target, source, strategy, on=["a"])
         received = lib.read("sym").data
         assert_frame_equal(received, expected)
 
@@ -348,7 +348,7 @@ class TestMergeTimeseriesUpdate:
 
         strategy = MergeStrategy(not_matched_by_target="do_nothing")
         lib.merge_experimental("sym", source, on=["b", "d", "e"], strategy=strategy)
-        expected = merge(target, source, strategy, on=["b", "d", "e"], inplace=True)
+        expected = merge(target, source, strategy, on=["b", "d", "e"])
         received = lib.read("sym").data
         assert_frame_equal(received, expected)
 
@@ -364,7 +364,7 @@ class TestMergeTimeseriesUpdate:
         source = pd.DataFrame({"a": [5], "b": [20.0]}, index=pd.DatetimeIndex([pd.Timestamp("2024-01-01")]))
         strategy = MergeStrategy(not_matched_by_target=MergeAction.DO_NOTHING)
         lib.merge_experimental("sym", source, strategy=strategy)
-        expected = merge(target, source, strategy, inplace=True)
+        expected = merge(target, source, strategy)
         received = lib.read("sym").data
         assert_frame_equal(received, expected)
 
@@ -380,7 +380,7 @@ class TestMergeTimeseriesUpdate:
         source = pd.DataFrame({"a": [5], "b": [20.0], "c": ["B"]}, index=pd.DatetimeIndex([pd.Timestamp("2024-01-02")]))
         strategy = MergeStrategy(not_matched_by_target=MergeAction.DO_NOTHING)
         lib.merge_experimental("sym", source, strategy=strategy)
-        expected = merge(target, source, strategy, inplace=True)
+        expected = merge(target, source, strategy)
         received = lib.read("sym").data
         assert_frame_equal(received, expected)
 
@@ -475,7 +475,7 @@ class TestMergeTimeseriesUpdate:
         # The merge will be performed on the latest undeleted version
         strategy = MergeStrategy(not_matched_by_target=MergeAction.DO_NOTHING)
         merge_vit = lib.merge_experimental("sym", source, strategy=strategy)
-        expected = merge(target, source, strategy, inplace=True)
+        expected = merge(target, source, strategy)
         read_vit = lib.read("sym")
         assert_vit_equals_except_data(merge_vit, read_vit)
         assert merge_vit.version == 2
@@ -522,7 +522,7 @@ class TestMergeTimeseriesUpdate:
         strategy = MergeStrategy(not_matched_by_target=MergeAction.DO_NOTHING)
         lib.merge_experimental("sym", source, strategy=strategy)
         result = lib.read("sym").data
-        expected = merge(pd.concat(target), source, strategy=strategy, inplace=True)
+        expected = merge(pd.concat(target), source, strategy=strategy)
         assert_frame_equal(result, expected)
 
     def test_sorted_segments_overlap(self, lmdb_version_store_v1):
@@ -537,7 +537,7 @@ class TestMergeTimeseriesUpdate:
             lib.append("test", tgt)
         lib.merge_experimental("test", source, strategy=strategy)
         res = lib.read("test").data
-        expected = merge(pd.concat(target_list), source, strategy=strategy, inplace=True)
+        expected = merge(pd.concat(target_list), source, strategy=strategy)
         assert_frame_equal(res, expected)
 
     def test_sorted_segments_overlap_but_source_is_in_first_segment_only(self, lmdb_version_store_v1):
@@ -551,7 +551,7 @@ class TestMergeTimeseriesUpdate:
             lib.append("test", tgt)
         lib.merge_experimental("test", source, strategy=strategy)
         res = lib.read("test").data
-        expected = merge(pd.concat(target_list), source, strategy=strategy, inplace=True)
+        expected = merge(pd.concat(target_list), source, strategy=strategy)
         assert_frame_equal(res, expected)
 
     def test_source_matches_first_value_of_first_segment_and_last_value_of_second_segment(self, lmdb_version_store_v1):
@@ -565,7 +565,7 @@ class TestMergeTimeseriesUpdate:
             lib.append("test", tgt)
         lib.merge_experimental("test", source, strategy=strategy)
         res = lib.read("test").data
-        expected = merge(pd.concat(target_list), source, strategy=strategy, inplace=True)
+        expected = merge(pd.concat(target_list), source, strategy=strategy)
         assert_frame_equal(res, expected)
 
 

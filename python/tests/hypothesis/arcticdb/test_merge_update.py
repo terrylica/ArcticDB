@@ -83,5 +83,5 @@ def test_merge_update(lmdb_version_store_v1, target_source):
     strategy = MergeStrategy(matched="update", not_matched_by_target="do_nothing")
     lib.merge_experimental(symbol, source, strategy=strategy)
     result = lib.read(symbol).data
-    expected = merge(pd.concat(target_list), source, strategy=strategy, inplace=True)
+    expected = merge(pd.concat(target_list), source, strategy=strategy)
     assert_frame_equal(result, expected)
