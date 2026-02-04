@@ -25,3 +25,18 @@ def test_collect_schema_basic(lmdb_library):
     lazy_df = lib.read(sym, lazy=True)
     schema = lazy_df.collect_schema()
     assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Float32)])
+
+
+def test_collect_schema_with_query(lmdb_library):
+    lib = lmdb_library
+    lib._nvs.set_output_format(OutputFormat.POLARS)
+    sym = "test_collect_schema_basic"
+    df = pd.DataFrame(
+        {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
+    )
+    lib.write(sym, df)
+
+    lazy_df = lib.read(sym, lazy=True)
+    lazy_df["new_col"] = 2 * lazy_df["col1"]
+    schema = lazy_df.collect_schema()
+    assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Float32), ("new_col", pl.Int64)])

@@ -224,7 +224,7 @@ class LocalVersionedEngine : public VersionedEngine {
             const VersionQuery& version_query
     );
 
-    folly::Future<SchemaItem> get_index(AtomKey&& k);
+    folly::Future<SchemaItem> get_index(AtomKey&& k, const ReadQuery& read_query);
 
     folly::Future<DescriptorItem> get_descriptor(AtomKey&& key);
 

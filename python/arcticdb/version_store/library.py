@@ -529,7 +529,7 @@ class LazyDataFrame(QueryBuilder):
             self._collect_schema_read_request = read_request
         desc = self._schema_item.desc
         # TODO: Handle default and specific string column types here
-        # Consider pushing this down into the C++ layer
+        # TODO: Consider pushing this down into the C++ layer
         res = []
         for field in desc.fields:
             res.append((field.name, self._td_to_pl_type(field.type_desc)))
