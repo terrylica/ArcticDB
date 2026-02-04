@@ -17,8 +17,10 @@ from typing import Optional, Any, Tuple, Dict, Union, List, Iterable, NamedTuple
 from arcticdb.dependencies import _PYARROW_AVAILABLE, pyarrow as pa
 from arcticdb.exceptions import ArcticDbNotYetImplemented, MissingKeysInStageResultsError
 from numpy import datetime64
+import polars as pl
 
 from arcticdb.options import LibraryOptions, EnterpriseLibraryOptions, OutputFormat, ArrowOutputStringFormat
+from arcticc.pb2.descriptors_pb2 import TypeDescriptor
 from arcticdb.preconditions import check
 from arcticdb.supported_types import Timestamp
 from arcticdb.util._versions import IS_PANDAS_TWO
@@ -505,6 +507,14 @@ class LazyDataFrame(QueryBuilder):
         """
         return self.lib.read(**self._to_read_request()._asdict())
 
+    def _td_to_pl_type(self, td):
+        # TODO: Move this somewhere else (and gracefully handle Polars not being installed)
+        # TODO: All the other types if we keep this in the Python layer
+        if td.value_type == TypeDescriptor.ValueType.INT:
+            return pl.Int64
+        elif td.value_type == TypeDescriptor.ValueType.FLOAT:
+            return pl.Float32
+
     # TODO: Add return type
     # TODO: Add same method to other Lazy* classes?
     def collect_schema(self):
@@ -516,11 +526,14 @@ class LazyDataFrame(QueryBuilder):
                 columns=read_request.columns,
                 query_builder=read_request.query_builder,
             )
-            desc = self._schema_item.desc
-            # TODO: Handle default and specific string column types here
-
             self._collect_schema_read_request = read_request
-        return self.schema
+        desc = self._schema_item.desc
+        # TODO: Handle default and specific string column types here
+        # Consider pushing this down into the C++ layer
+        res = []
+        for field in desc.fields:
+            res.append((field.name, self._td_to_pl_type(field.type_desc)))
+        return pl.Schema(res)
 
     def __str__(self) -> str:
         query_builder_repr = super().__str__()

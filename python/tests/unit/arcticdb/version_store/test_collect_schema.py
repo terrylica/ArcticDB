@@ -8,6 +8,7 @@ As of the Change Date specified in that file, in accordance with the Business So
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from arcticdb.options import OutputFormat
 
@@ -18,9 +19,9 @@ def test_collect_schema_basic(lmdb_library):
     sym = "test_collect_schema_basic"
     df = pd.DataFrame(
         {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
-        index=pd.date_range("2000-01-01", periods=10),
     )
     lib.write(sym, df)
 
     lazy_df = lib.read(sym, lazy=True)
     schema = lazy_df.collect_schema()
+    assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Float32)])
