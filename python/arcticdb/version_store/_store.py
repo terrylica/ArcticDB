@@ -641,6 +641,25 @@ class NativeVersionStore:
     def _write_options(self):
         return self._lib_cfg.lib_desc.version.write_options
 
+    # TODO: Add return type
+    def _read_schema(
+        self,
+        symbol,
+        as_of=None,
+        columns=None,
+        query_builder=None,
+    ):
+        # Take a copy as _get_queries can modify the input argument, which makes reusing the input counter-intuitive
+        query_builder = copy.deepcopy(query_builder)
+        version_query, read_options, read_query, _ = self._get_queries(
+            as_of=as_of,
+            date_range=None,
+            row_range=None,
+            columns=columns,
+            query_builder=query_builder,
+        )
+        return self.version_store._read_schema(symbol, version_query, read_options, read_query)
+
     def stage(
         self,
         symbol: str,

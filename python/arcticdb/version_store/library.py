@@ -467,7 +467,10 @@ class LazyDataFrame(QueryBuilder):
             self._python_clauses = read_request.query_builder._python_clauses
             self._optimisation = read_request.query_builder._optimisation
         self.lib = lib
+        self.schema = None
+        self._index_segment = None
         self.read_request = read_request._replace(query_builder=None)
+        self._collect_schema_read_request = None
 
     def _to_read_request(self) -> ReadRequest:
         """
@@ -502,6 +505,21 @@ class LazyDataFrame(QueryBuilder):
             Object that contains a .data and .metadata element.
         """
         return self.lib.read(**self._to_read_request()._asdict())
+
+    # TODO: Add return type
+    # TODO: Add same method to other Lazy* classes?
+    def collect_schema(self):
+        read_request = self._to_read_request()
+        if read_request != self._collect_schema_read_request:
+            stream_descriptor, self._index_segment = self.lib._read_schema(
+                symbol=read_request.symbol,
+                as_of=read_request.as_of,
+                columns=read_request.columns,
+                query_builder=read_request.query_builder,
+            )
+            # TODO: Turn StreamDescriptor protobuf into Polars schema here
+            self._collect_schema_read_request = read_request
+        return self.schema
 
     def __str__(self) -> str:
         query_builder_repr = super().__str__()
@@ -893,6 +911,21 @@ class Library:
             return True
         else:
             return False
+
+    # TODO: Add return type
+    def _read_schema(
+        self,
+        symbol: str,
+        as_of: Optional[AsOf] = None,
+        columns: Optional[List[str]] = None,
+        query_builder: Optional[QueryBuilder] = None,
+    ):
+        return self._nvs._read_schema(
+            symbol=symbol,
+            as_of=as_of,
+            columns=columns,
+            query_builder=query_builder,
+        )
 
     def options(self) -> LibraryOptions:
         """Library options set on this library. See also `enterprise_options`."""

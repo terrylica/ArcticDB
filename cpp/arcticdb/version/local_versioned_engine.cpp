@@ -454,6 +454,14 @@ ReadVersionWithNodesOutput LocalVersionedEngine::read_dataframe_version_internal
     }
 }
 
+std::pair<StreamDescriptor, SegmentInMemory> LocalVersionedEngine::read_schema_internal(
+        ARCTICDB_UNUSED const StreamId& stream_id, ARCTICDB_UNUSED const VersionQuery& version_query,
+        ARCTICDB_UNUSED const ReadOptions& read_options, ARCTICDB_UNUSED const std::shared_ptr<ReadQuery>& read_query
+) {
+    py::gil_scoped_release release_gil;
+    return {};
+}
+
 VersionedItem LocalVersionedEngine::read_modify_write_internal(
         const StreamId& source_stream, const StreamId& target_stream, const VersionQuery& version_query,
         const std::shared_ptr<ReadQuery>& read_query, const ReadOptions& read_options, bool prune_previous_versions,

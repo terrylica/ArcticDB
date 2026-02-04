@@ -11,6 +11,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <arcticdb/entity/data_error.hpp>
+#include <arcticdb/entity/protobuf_mappings.hpp>
 #include <arcticdb/version/version_store_api.hpp>
 #include <arcticdb/version/python_bindings_common.hpp>
 #include <arcticdb/python/python_utils.hpp>
@@ -810,6 +811,26 @@ void register_bindings(py::module& version, py::exception<arcticdb::ArcticExcept
                     },
                     py::call_guard<SingleThreadMutexHolder>(),
                     "Read the most recent dataframe from the store"
+            )
+            .def(
+                    "_read_schema",
+                    [&](PythonVersionStore& v,
+                        StreamId sid,
+                        const VersionQuery& version_query,
+                        const ReadOptions& read_options,
+                        const std::shared_ptr<ReadQuery>& read_query) {
+                        auto [stream_desc, seg] = v.read_schema(sid, version_query, read_options, read_query);
+                        // TODO: Profile how slow this (and iteration in Python) is for wide dataframes, and consider
+                        //  adding Python bindings for our more efficient StreamDescriptor representation (or just the
+                        //  needed bits)
+                        arcticdb::proto::descriptors::StreamDescriptor stream_desc_proto;
+                        copy_stream_descriptor_to_proto(stream_desc, stream_desc_proto);
+                        return std::make_pair(python_util::pb_to_python(stream_desc_proto), std::move(seg));
+                    },
+                    py::call_guard<SingleThreadMutexHolder>(),
+                    "Read the index key for the specified symbol-version pair. Apply any queries and column filtering, "
+                    "and return the schema and a cached SegmentInMemory of the read index key so it doesn't need to be "
+                    "read again."
             )
             .def("get_update_time",
                  &PythonVersionStore::get_update_time,
