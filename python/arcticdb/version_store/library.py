@@ -467,9 +467,8 @@ class LazyDataFrame(QueryBuilder):
             self._python_clauses = read_request.query_builder._python_clauses
             self._optimisation = read_request.query_builder._optimisation
         self.lib = lib
-        self.schema = None
-        self._index_segment = None
         self.read_request = read_request._replace(query_builder=None)
+        self._schema_item = None
         self._collect_schema_read_request = None
 
     def _to_read_request(self) -> ReadRequest:
@@ -511,13 +510,15 @@ class LazyDataFrame(QueryBuilder):
     def collect_schema(self):
         read_request = self._to_read_request()
         if read_request != self._collect_schema_read_request:
-            stream_descriptor, self._index_segment = self.lib._read_schema(
+            self._schema_item = self.lib._read_schema(
                 symbol=read_request.symbol,
                 as_of=read_request.as_of,
                 columns=read_request.columns,
                 query_builder=read_request.query_builder,
             )
-            # TODO: Turn StreamDescriptor protobuf into Polars schema here
+            desc = self._schema_item.desc
+            # TODO: Handle default and specific string column types here
+
             self._collect_schema_read_request = read_request
         return self.schema
 

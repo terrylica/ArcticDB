@@ -454,12 +454,28 @@ ReadVersionWithNodesOutput LocalVersionedEngine::read_dataframe_version_internal
     }
 }
 
-std::pair<StreamDescriptor, SegmentInMemory> LocalVersionedEngine::read_schema_internal(
+folly::Future<SchemaItem> LocalVersionedEngine::get_index(AtomKey&& k) {
+    const auto key = std::move(k);
+    return store()->read(key).thenValue([](auto&& key_seg_pair) -> SchemaItem {
+        auto key = to_atom(std::move(key_seg_pair.first));
+        auto seg = std::move(key_seg_pair.second);
+        auto initial_desc = seg.index_descriptor().as_stream_descriptor();
+        // TODO: Handle any query processing here with modify_schema
+        return SchemaItem{std::move(key), std::move(seg), std::move(initial_desc)};
+    });
+}
+
+SchemaItem LocalVersionedEngine::read_schema_internal(
         ARCTICDB_UNUSED const StreamId& stream_id, ARCTICDB_UNUSED const VersionQuery& version_query,
         ARCTICDB_UNUSED const ReadOptions& read_options, ARCTICDB_UNUSED const std::shared_ptr<ReadQuery>& read_query
 ) {
     py::gil_scoped_release release_gil;
-    return {};
+    ARCTICDB_SAMPLE(ReadSchema, 0)
+    auto version = get_version_to_read(stream_id, version_query);
+    missing_data::check<ErrorCode::E_NO_SUCH_VERSION>(
+            version.has_value(), "Unable to retrieve schema data. {}@{}: version not found", stream_id, version_query
+    );
+    return get_index(std::move(version->key_)).get();
 }
 
 VersionedItem LocalVersionedEngine::read_modify_write_internal(

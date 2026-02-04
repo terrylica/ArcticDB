@@ -1058,7 +1058,7 @@ ReadResult PythonVersionStore::read_dataframe_version(
     );
 }
 
-std::pair<StreamDescriptor, SegmentInMemory> PythonVersionStore::read_schema(
+SchemaItem PythonVersionStore::read_schema(
         const StreamId& stream_id, const VersionQuery& version_query, const ReadOptions& read_options,
         const std::shared_ptr<ReadQuery>& read_query
 ) {

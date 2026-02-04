@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <arcticdb/entity/schema_item.hpp>
 #include <arcticdb/version/version_map.hpp>
 #include <arcticdb/version/symbol_list.hpp>
 #include <arcticdb/version/snapshot.hpp>
@@ -160,7 +161,7 @@ class LocalVersionedEngine : public VersionedEngine {
             const ReadOptions& read_options, std::any& handler_data
     ) override;
 
-    std::pair<StreamDescriptor, SegmentInMemory> read_schema_internal(
+    SchemaItem read_schema_internal(
             const StreamId& stream_id, const VersionQuery& version_query, const ReadOptions& read_options,
             const std::shared_ptr<ReadQuery>& read_query
     ) override;
@@ -222,6 +223,8 @@ class LocalVersionedEngine : public VersionedEngine {
             folly::Future<std::optional<AtomKey>>&& opt_index_key_fut, const StreamId& stream_id,
             const VersionQuery& version_query
     );
+
+    folly::Future<SchemaItem> get_index(AtomKey&& k);
 
     folly::Future<DescriptorItem> get_descriptor(AtomKey&& key);
 

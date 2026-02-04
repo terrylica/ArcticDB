@@ -325,6 +325,10 @@ void register_bindings(py::module& version, py::exception<arcticdb::ArcticExcept
             .def_property_readonly("creation_ts", &DescriptorItem::creation_ts)
             .def_property_readonly("timeseries_descriptor", &DescriptorItem::timeseries_descriptor);
 
+    py::class_<SchemaItem>(version, "SchemaItem").def_property_readonly("desc", [](const SchemaItem& self) {
+        return python_util::pb_to_python(self.desc_);
+    });
+
     py::class_<StageResult>(version, "StageResult", R"pbdoc(
         Result returned by the stage method containing information about staged segments.
         
@@ -819,13 +823,7 @@ void register_bindings(py::module& version, py::exception<arcticdb::ArcticExcept
                         const VersionQuery& version_query,
                         const ReadOptions& read_options,
                         const std::shared_ptr<ReadQuery>& read_query) {
-                        auto [stream_desc, seg] = v.read_schema(sid, version_query, read_options, read_query);
-                        // TODO: Profile how slow this (and iteration in Python) is for wide dataframes, and consider
-                        //  adding Python bindings for our more efficient StreamDescriptor representation (or just the
-                        //  needed bits)
-                        arcticdb::proto::descriptors::StreamDescriptor stream_desc_proto;
-                        copy_stream_descriptor_to_proto(stream_desc, stream_desc_proto);
-                        return std::make_pair(python_util::pb_to_python(stream_desc_proto), std::move(seg));
+                        return v.read_schema(sid, version_query, read_options, read_query);
                     },
                     py::call_guard<SingleThreadMutexHolder>(),
                     "Read the index key for the specified symbol-version pair. Apply any queries and column filtering, "
