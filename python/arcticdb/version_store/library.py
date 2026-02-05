@@ -531,7 +531,7 @@ class LazyDataFrame(QueryBuilder):
         elif td.value_type == TypeDescriptor.ValueType.BOOL:
             return pl.Boolean
         elif td.value_type == TypeDescriptor.ValueType.NANOSECONDS_UTC:
-            return pl.Datetime
+            return pl.Datetime("ns")
         elif td.value_type in {
             TypeDescriptor.ValueType.ASCII_STRING,
             TypeDescriptor.ValueType.UTF8_STRING,

@@ -18,13 +18,13 @@ def test_collect_schema_basic(lmdb_library):
     lib._nvs.set_output_format(OutputFormat.POLARS)
     sym = "test_collect_schema_basic"
     df = pd.DataFrame(
-        {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
+        {"col1": np.arange(1, dtype=np.int64), "col2": [True], "col3": [pd.Timestamp("2025-01-01")]},
     )
     lib.write(sym, df)
 
     lazy_df = lib.read(sym, lazy=True)
     schema = lazy_df.collect_schema()
-    assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Float32)])
+    assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Boolean), ("col3", pl.Datetime("ns"))])
 
 
 def test_collect_schema_string_types(lmdb_library):
@@ -70,6 +70,28 @@ def test_collect_schema_column_filtering(lmdb_library):
 
     lazy_df = lib.read(sym, columns=["col2"], lazy=True)
     schema = lazy_df.collect_schema()
+    assert schema == pl.Schema([("col2", pl.Float32)])
+
+
+def test_collect_schema_timeseries(lmdb_library):
+    lib = lmdb_library
+    lib._nvs.set_output_format(OutputFormat.POLARS)
+    sym = "test_collect_schema_timeseries"
+    df = pd.DataFrame(
+        {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
+        index=pd.date_range("2025-01-01", periods=10),
+    )
+    # Unnamed, no column selection
+    lib.write(sym, df)
+    schema = lib.read(sym, lazy=True).collect_schema()
+    assert schema == pl.Schema([("index", pl.Datetime("ns")), ("col1", pl.Int64), ("col2", pl.Float32)])
+    # Named, no column selection
+    df.index.name = "ts"
+    lib.write(sym, df)
+    schema = lib.read(sym, lazy=True).collect_schema()
+    assert schema == pl.Schema([("ts", pl.Datetime("ns")), ("col1", pl.Int64), ("col2", pl.Float32)])
+    # With column selection. Note the index column is dropped, as this will be the behaviour Polars expects
+    schema = lib.read(sym, columns=["col2"], lazy=True).collect_schema()
     assert schema == pl.Schema([("col2", pl.Float32)])
 
 
