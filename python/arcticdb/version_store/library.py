@@ -545,12 +545,17 @@ class LazyDataFrame(QueryBuilder):
                 if self.read_request.arrow_string_format_default is not None
                 else InternalArrowOutputStringFormat.LARGE_STRING
             )
-            res = pl.Categorical if default_string_type == InternalArrowOutputStringFormat.CATEGORICAL else pl.String
+            # TODO: Test if subsequent processing works correctly on categorical columns with this arbitrary category
+            res = (
+                pl.Categorical(["a"])
+                if default_string_type == InternalArrowOutputStringFormat.CATEGORICAL
+                else pl.String
+            )
             if self.read_request.arrow_string_format_per_column is not None:
                 override = self.read_request.arrow_string_format_per_column.get(name, None)
                 if override is not None:
                     res = (
-                        pl.Categorical
+                        pl.Categorical(["a"])
                         if arrow_output_string_format_to_internal(override, OutputFormat.POLARS)
                         == InternalArrowOutputStringFormat.CATEGORICAL
                         else pl.String
