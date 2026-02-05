@@ -8,6 +8,7 @@ As of the Change Date specified in that file, in accordance with the Business So
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 import polars as pl
 import pytest
 
@@ -20,38 +21,53 @@ from arcticdb.util.test import assert_frame_equal_with_arrow, config_context
 def test_collect_schema_basic(lmdb_library):
     lib = lmdb_library
     lib._nvs.set_output_format(OutputFormat.POLARS)
+    lib._nvs._set_allow_arrow_input()
     sym = "test_collect_schema_basic"
-    df = pd.DataFrame(
-        {"col1": np.arange(1, dtype=np.int64), "col2": [True], "col3": [pd.Timestamp("2025-01-01")]},
+    table = pa.table(
+        {
+            "uint8": pa.array([0], pa.uint8()),
+            "uint16": pa.array([1], pa.uint16()),
+            "uint32": pa.array([2], pa.uint32()),
+            "uint64": pa.array([3], pa.uint64()),
+            "int8": pa.array([4], pa.int8()),
+            "int16": pa.array([5], pa.int16()),
+            "int32": pa.array([6], pa.int32()),
+            "int64": pa.array([7], pa.int64()),
+            "float32": pa.array([8], pa.float32()),
+            "float64": pa.array([9], pa.float64()),
+            "timestamp": pa.array([pa.scalar(10, type=pa.timestamp("ns"))]),
+        }
     )
-    lib.write(sym, df)
+    lib.write(sym, table)
 
     lazy_df = lib.read(sym, lazy=True)
     schema = lazy_df.collect_schema()
-    assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Boolean), ("col3", pl.Datetime("ns"))])
+    assert schema == pl.from_arrow(table).schema
 
 
 def test_collect_schema_string_types(lmdb_library):
     lib = lmdb_library
     lib._nvs.set_output_format(OutputFormat.POLARS)
+    lib._nvs._set_allow_arrow_input()
     sym = "test_collect_schema_string_types"
-    df = pd.DataFrame(
-        {"col1": ["a"], "col2": ["b"]},
-    )
-    lib.write(sym, df)
+    table = pa.table({"col1": pa.array(["a"], pa.string()), "col2": pa.array(["b"], pa.string())})
+    lib.write(sym, table)
 
+    df = pl.from_arrow(table)
     # No overrides
     lazy_df = lib.read(sym, lazy=True)
     schema = lazy_df.collect_schema()
-    assert schema == pl.Schema([("col1", pl.String), ("col2", pl.String)])
+    assert schema == df.schema
     # Default override
     lazy_df = lib.read(sym, arrow_string_format_default=ArrowOutputStringFormat.CATEGORICAL, lazy=True)
     schema = lazy_df.collect_schema()
-    assert schema == pl.Schema([("col1", pl.Categorical(["b"])), ("col2", pl.Categorical(["b"]))])
+    expected_schema = df.select(pl.col("col1").cast(pl.Categorical), pl.col("col2").cast(pl.Categorical)).schema
+    assert schema == expected_schema
     # Specific override
     lazy_df = lib.read(sym, arrow_string_format_per_column={"col1": ArrowOutputStringFormat.CATEGORICAL}, lazy=True)
     schema = lazy_df.collect_schema()
-    assert schema == pl.Schema([("col1", pl.Categorical(["b"])), ("col2", pl.String)])
+    expected_schema = df.select(pl.col("col1").cast(pl.Categorical), pl.col("col2")).schema
+    assert schema == expected_schema
     # Default and specific override
     lazy_df = lib.read(
         sym,
@@ -60,21 +76,22 @@ def test_collect_schema_string_types(lmdb_library):
         lazy=True,
     )
     schema = lazy_df.collect_schema()
-    assert schema == pl.Schema([("col1", pl.String), ("col2", pl.Categorical(["b"]))])
+    expected_schema = df.select(pl.col("col1"), pl.col("col2").cast(pl.Categorical)).schema
+    assert schema == expected_schema
 
 
 def test_collect_schema_column_filtering(lmdb_library):
     lib = lmdb_library
     lib._nvs.set_output_format(OutputFormat.POLARS)
+    lib._nvs._set_allow_arrow_input()
     sym = "test_collect_schema_basic"
-    df = pd.DataFrame(
-        {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
-    )
-    lib.write(sym, df)
+    table = pa.table({"col1": pa.array([0], pa.int64()), "col2": pa.array([1], pa.float32())})
+    lib.write(sym, table)
 
     lazy_df = lib.read(sym, columns=["col2"], lazy=True)
     schema = lazy_df.collect_schema()
-    assert schema == pl.Schema([("col2", pl.Float32)])
+    expected_schema = pl.from_arrow(table).select(pl.col("col2")).schema
+    assert schema == expected_schema
 
 
 def test_collect_schema_timeseries(lmdb_library):
@@ -102,11 +119,11 @@ def test_collect_schema_timeseries(lmdb_library):
 def test_collect_schema_with_query(lmdb_library):
     lib = lmdb_library
     lib._nvs.set_output_format(OutputFormat.POLARS)
+    lib._nvs._set_allow_arrow_input()
+
     sym = "test_collect_schema_basic"
-    df = pd.DataFrame(
-        {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
-    )
-    lib.write(sym, df)
+    table = pa.table({"col1": pa.array([0], pa.int64()), "col2": pa.array([1], pa.float32())})
+    lib.write(sym, table)
 
     lazy_df = lib.read(sym, lazy=True)
     lazy_df["new_col"] = 2 * lazy_df["col1"]

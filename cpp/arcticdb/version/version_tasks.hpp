@@ -17,7 +17,6 @@
 
 namespace arcticdb {
 
-// TODO: Search for all uses of the old variant and replace with this
 using VersionIdentifier = std::variant<VersionedItem, StreamId, std::shared_ptr<SchemaItem>>;
 
 struct UpdateMetadataTask : async::BaseTask {

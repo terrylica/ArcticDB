@@ -524,8 +524,6 @@ class LazyDataFrame(QueryBuilder):
             return self.lib.read(**read_request._asdict())
 
     def _td_to_pl_type(self, name, td):
-        # TODO: Move this somewhere else (and gracefully handle Polars not being installed)
-        # TODO: All the other types if we keep this in the Python layer
         size_bits = pow(2, td.size_bits + 2)
         if td.value_type == TypeDescriptor.ValueType.UINT:
             return getattr(pl, f"UInt{size_bits}")
@@ -550,7 +548,6 @@ class LazyDataFrame(QueryBuilder):
                 if self.read_request.arrow_string_format_default is not None
                 else InternalArrowOutputStringFormat.LARGE_STRING
             )
-            # TODO: Test if subsequent processing works correctly on categorical columns with this arbitrary category
             res = (
                 pl.Categorical(["a"])
                 if default_string_type == InternalArrowOutputStringFormat.CATEGORICAL
@@ -570,7 +567,6 @@ class LazyDataFrame(QueryBuilder):
             raise ArcticNativeException(f"Cannot convert type {td} to a Polars type")
 
     # TODO: Add return type
-    # TODO: Add same method to other Lazy* classes?
     def collect_schema(self):
         read_request = self._to_read_request()
         if read_request != self._collect_schema_read_request:
@@ -582,7 +578,6 @@ class LazyDataFrame(QueryBuilder):
             )
             self._collect_schema_read_request = read_request
         desc = self._schema_item.desc
-        # TODO: Consider pushing this down into the C++ layer
         res = []
         for field in desc.fields:
             res.append((field.name, self._td_to_pl_type(field.name, field.type_desc)))
