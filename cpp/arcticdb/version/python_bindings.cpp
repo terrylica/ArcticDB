@@ -191,7 +191,8 @@ void register_bindings(py::module& version, py::exception<arcticdb::ArcticExcept
             .def(py::init())
             .def("set_snap_name", &VersionQuery::set_snap_name)
             .def("set_timestamp", &VersionQuery::set_timestamp)
-            .def("set_version", &VersionQuery::set_version);
+            .def("set_version", &VersionQuery::set_version)
+            .def("set_schema_item", &VersionQuery::set_schema_item);
 
     py::enum_<OutputFormat>(version, "InternalOutputFormat")
             .value("PANDAS", OutputFormat::PANDAS)
@@ -325,9 +326,10 @@ void register_bindings(py::module& version, py::exception<arcticdb::ArcticExcept
             .def_property_readonly("creation_ts", &DescriptorItem::creation_ts)
             .def_property_readonly("timeseries_descriptor", &DescriptorItem::timeseries_descriptor);
 
-    py::class_<SchemaItem>(version, "SchemaItem").def_property_readonly("desc", [](const SchemaItem& self) {
-        return python_util::pb_to_python(self.desc_);
-    });
+    py::class_<SchemaItem, std::shared_ptr<SchemaItem>>(version, "SchemaItem")
+            .def_property_readonly("desc", [](const SchemaItem& self) {
+                return python_util::pb_to_python(self.desc_);
+            });
 
     py::class_<StageResult>(version, "StageResult", R"pbdoc(
         Result returned by the stage method containing information about staged segments.

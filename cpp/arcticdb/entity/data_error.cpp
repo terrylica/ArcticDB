@@ -32,6 +32,12 @@ DataError::DataError(
                     version_request_type_ = VersionRequestType::SPECIFIC;
                     version_request_data_ = query.version_id_;
                 },
+                [this](const std::shared_ptr<SchemaItem>& query) {
+                    // TODO: Cache the initial version query in the schema item, and use it here
+                    // Or get rid of this, DataError is only for batch methods anyway
+                    version_request_type_ = VersionRequestType::SPECIFIC;
+                    version_request_data_ = query->key_.version_id();
+                },
                 [this](const std::monostate&) { version_request_type_ = VersionRequestType::LATEST; }
         );
     }

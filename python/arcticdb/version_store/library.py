@@ -46,6 +46,7 @@ from arcticdb_ext.version_store import (
     StageResult,
     KeyNotFoundInStageResultInfo,
     InternalArrowOutputStringFormat,
+    SchemaItem,
 )
 
 import pandas as pd
@@ -58,7 +59,7 @@ import arcticdb_ext as _ae
 logger = logging.getLogger(__name__)
 
 
-AsOf = Union[int, str, datetime.datetime]
+AsOf = Union[int, str, datetime.datetime, SchemaItem]
 
 
 NORMALIZABLE_TYPES = (pd.DataFrame, pd.Series, np.ndarray)
@@ -516,7 +517,11 @@ class LazyDataFrame(QueryBuilder):
         VersionedItem
             Object that contains a .data and .metadata element.
         """
-        return self.lib.read(**self._to_read_request()._asdict())
+        if self._schema_item is None:
+            return self.lib.read(**self._to_read_request()._asdict())
+        else:
+            read_request = self.read_request._replace(as_of=self._schema_item)
+            return self.lib.read(**read_request._asdict())
 
     def _td_to_pl_type(self, name, td):
         # TODO: Move this somewhere else (and gracefully handle Polars not being installed)

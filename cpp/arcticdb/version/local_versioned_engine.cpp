@@ -392,6 +392,10 @@ std::optional<VersionedItem> LocalVersionedEngine::get_version_to_read(
             [&stream_id, &version_query, this](const TimestampVersionQuery& timestamp) {
                 return get_version_at_time(stream_id, timestamp.timestamp_, version_query);
             },
+            [](ARCTICDB_UNUSED const std::shared_ptr<SchemaItem>& schema_item) {
+                util::raise_rte("get_version_to_read shouldn't be called with SchemaItem input");
+                return std::optional<VersionedItem>();
+            },
             [&stream_id, this](const std::monostate&) { return get_latest_version(stream_id); }
     );
 }
@@ -404,7 +408,7 @@ IndexRange LocalVersionedEngine::get_index_range(const StreamId& stream_id, cons
     return index::get_index_segment_range(version->key_, store());
 }
 
-std::variant<VersionedItem, StreamId> get_version_identifier(
+VersionIdentifier get_version_identifier(
         const StreamId& stream_id, const VersionQuery& version_query, const ReadOptions& read_options,
         const std::optional<VersionedItem>& version
 ) {
@@ -428,8 +432,14 @@ ReadVersionWithNodesOutput LocalVersionedEngine::read_dataframe_version_internal
         const ReadOptions& read_options, std::any& handler_data
 ) {
     py::gil_scoped_release release_gil;
-    auto version = get_version_to_read(stream_id, version_query);
-    const auto identifier = get_version_identifier(stream_id, version_query, read_options, version);
+    const auto identifier = util::variant_match(
+            version_query.content_,
+            [&](const std::shared_ptr<SchemaItem>& schema_item) -> VersionIdentifier { return {schema_item}; },
+            [&](const auto&) -> VersionIdentifier {
+                auto version = get_version_to_read(stream_id, version_query);
+                return get_version_identifier(stream_id, version_query, read_options, version);
+            }
+    );
 
     auto root_result = read_frame_for_version(store(), identifier, read_query, read_options, handler_data).get();
     auto& keys = root_result.frame_and_descriptor_.keys_;
@@ -491,6 +501,7 @@ SchemaItem LocalVersionedEngine::read_schema_internal(
     missing_data::check<ErrorCode::E_NO_SUCH_VERSION>(
             version.has_value(), "Unable to retrieve schema data. {}@{}: version not found", stream_id, version_query
     );
+    // TODO: Throw on multiindex here as well
     return get_index(std::move(version->key_), *read_query).get();
 }
 

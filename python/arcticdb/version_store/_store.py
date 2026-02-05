@@ -32,7 +32,7 @@ import time
 from arcticdb.dependencies import pyarrow as pa
 from arcticdb.dependencies import polars as pl
 from arcticc.pb2.descriptors_pb2 import IndexDescriptor, TypeDescriptor
-from arcticdb_ext.version_store import RecordBatchData, SortedValue, StageResult
+from arcticdb_ext.version_store import RecordBatchData, SortedValue, StageResult, SchemaItem
 from arcticc.pb2.storage_pb2 import LibraryConfig, EnvironmentConfigsMap
 from arcticdb.preconditions import check
 from arcticdb.supported_types import DateRangeInput, ExplicitlySupportedDates
@@ -260,7 +260,7 @@ def _env_config_from_lib_config(lib_cfg, env):
     return cfg
 
 
-VersionQueryInput = Union[int, str, ExplicitlySupportedDates, None]
+VersionQueryInput = Union[int, str, ExplicitlySupportedDates, None, SchemaItem]
 
 
 def _normalize_dt_range(dtr: DateRangeInput) -> _IndexRange:
@@ -2064,6 +2064,8 @@ class NativeVersionStore:
             version_query.set_version(as_of, iterate_snapshots_if_tombstoned)
         elif isinstance(as_of, (datetime, Timestamp)):
             version_query.set_timestamp(Timestamp(as_of).value, iterate_snapshots_if_tombstoned)
+        elif isinstance(as_of, SchemaItem):
+            version_query.set_schema_item(as_of)
         elif as_of is not None:
             raise ArcticNativeException("Unexpected combination of read parameters")
 
