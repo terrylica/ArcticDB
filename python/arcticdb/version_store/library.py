@@ -15,11 +15,17 @@ from enum import Enum, auto
 from typing import Optional, Any, Tuple, Dict, Union, List, Iterable, NamedTuple
 
 from arcticdb.dependencies import _PYARROW_AVAILABLE, pyarrow as pa
-from arcticdb.exceptions import ArcticDbNotYetImplemented, MissingKeysInStageResultsError
+from arcticdb.exceptions import ArcticNativeException, ArcticDbNotYetImplemented, MissingKeysInStageResultsError
 from numpy import datetime64
 import polars as pl
 
-from arcticdb.options import LibraryOptions, EnterpriseLibraryOptions, OutputFormat, ArrowOutputStringFormat
+from arcticdb.options import (
+    LibraryOptions,
+    EnterpriseLibraryOptions,
+    OutputFormat,
+    ArrowOutputStringFormat,
+    arrow_output_string_format_to_internal,
+)
 from arcticc.pb2.descriptors_pb2 import TypeDescriptor
 from arcticdb.preconditions import check
 from arcticdb.supported_types import Timestamp
@@ -35,7 +41,12 @@ from arcticdb.version_store._store import (
     MergeAction,
 )
 from arcticdb_ext.exceptions import ArcticException
-from arcticdb_ext.version_store import DataError, StageResult, KeyNotFoundInStageResultInfo
+from arcticdb_ext.version_store import (
+    DataError,
+    StageResult,
+    KeyNotFoundInStageResultInfo,
+    InternalArrowOutputStringFormat,
+)
 
 import pandas as pd
 import numpy as np
@@ -507,13 +518,46 @@ class LazyDataFrame(QueryBuilder):
         """
         return self.lib.read(**self._to_read_request()._asdict())
 
-    def _td_to_pl_type(self, td):
+    def _td_to_pl_type(self, name, td):
         # TODO: Move this somewhere else (and gracefully handle Polars not being installed)
         # TODO: All the other types if we keep this in the Python layer
-        if td.value_type == TypeDescriptor.ValueType.INT:
-            return pl.Int64
+        size_bits = pow(2, td.size_bits + 2)
+        if td.value_type == TypeDescriptor.ValueType.UINT:
+            return getattr(pl, f"UInt{size_bits}")
+        elif td.value_type == TypeDescriptor.ValueType.INT:
+            return getattr(pl, f"Int{size_bits}")
         elif td.value_type == TypeDescriptor.ValueType.FLOAT:
-            return pl.Float32
+            return getattr(pl, f"Float{size_bits}")
+        elif td.value_type == TypeDescriptor.ValueType.BOOL:
+            return pl.Boolean
+        elif td.value_type == TypeDescriptor.ValueType.NANOSECONDS_UTC:
+            return pl.Datetime
+        elif td.value_type in {
+            TypeDescriptor.ValueType.ASCII_STRING,
+            TypeDescriptor.ValueType.UTF8_STRING,
+            TypeDescriptor.ValueType.DYNAMIC_STRING,
+            TypeDescriptor.ValueType.DYNAMIC_UTF8,
+        }:
+            default_string_type = (
+                arrow_output_string_format_to_internal(
+                    self.read_request.arrow_string_format_default, OutputFormat.POLARS
+                )
+                if self.read_request.arrow_string_format_default is not None
+                else InternalArrowOutputStringFormat.LARGE_STRING
+            )
+            res = pl.Categorical if default_string_type == InternalArrowOutputStringFormat.CATEGORICAL else pl.String
+            if self.read_request.arrow_string_format_per_column is not None:
+                override = self.read_request.arrow_string_format_per_column.get(name, None)
+                if override is not None:
+                    res = (
+                        pl.Categorical
+                        if arrow_output_string_format_to_internal(override, OutputFormat.POLARS)
+                        == InternalArrowOutputStringFormat.CATEGORICAL
+                        else pl.String
+                    )
+            return res
+        else:
+            raise ArcticNativeException(f"Cannot convert type {td} to a Polars type")
 
     # TODO: Add return type
     # TODO: Add same method to other Lazy* classes?
@@ -528,11 +572,10 @@ class LazyDataFrame(QueryBuilder):
             )
             self._collect_schema_read_request = read_request
         desc = self._schema_item.desc
-        # TODO: Handle default and specific string column types here
         # TODO: Consider pushing this down into the C++ layer
         res = []
         for field in desc.fields:
-            res.append((field.name, self._td_to_pl_type(field.type_desc)))
+            res.append((field.name, self._td_to_pl_type(field.name, field.type_desc)))
         return pl.Schema(res)
 
     def __str__(self) -> str:

@@ -481,7 +481,6 @@ folly::Future<SchemaItem> LocalVersionedEngine::get_index(AtomKey&& k, const Rea
     });
 }
 
-// TODO: Make read_query const&?
 SchemaItem LocalVersionedEngine::read_schema_internal(
         const StreamId& stream_id, const VersionQuery& version_query, ARCTICDB_UNUSED const ReadOptions& read_options,
         const std::shared_ptr<ReadQuery>& read_query
