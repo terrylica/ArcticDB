@@ -27,6 +27,20 @@ def test_collect_schema_basic(lmdb_library):
     assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Float32)])
 
 
+def test_collect_schema_column_filtering(lmdb_library):
+    lib = lmdb_library
+    lib._nvs.set_output_format(OutputFormat.POLARS)
+    sym = "test_collect_schema_basic"
+    df = pd.DataFrame(
+        {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
+    )
+    lib.write(sym, df)
+
+    lazy_df = lib.read(sym, columns=["col2"], lazy=True)
+    schema = lazy_df.collect_schema()
+    assert schema == pl.Schema([("col2", pl.Float32)])
+
+
 def test_collect_schema_with_query(lmdb_library):
     lib = lmdb_library
     lib._nvs.set_output_format(OutputFormat.POLARS)

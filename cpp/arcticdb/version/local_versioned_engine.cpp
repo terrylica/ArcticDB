@@ -464,8 +464,20 @@ folly::Future<SchemaItem> LocalVersionedEngine::get_index(AtomKey&& k, const Rea
         for (const auto& clause : read_query.clauses_) {
             schema = clause->modify_schema(std::move(schema));
         }
-        // TODO: Column filtering
-        return SchemaItem{std::move(key), std::move(seg), std::move(std::get<0>(schema.release()))};
+        if (read_query.columns.has_value()) {
+            ankerl::unordered_dense::set<std::string_view> cols(
+                    read_query.columns->cbegin(), read_query.columns->cend()
+            );
+            StreamDescriptor filtered_desc;
+            for (const auto& field : schema.stream_descriptor().fields()) {
+                if (cols.contains(field.name())) {
+                    filtered_desc.add_field(field);
+                }
+            }
+            return SchemaItem{std::move(key), std::move(seg), std::move(filtered_desc)};
+        } else {
+            return SchemaItem{std::move(key), std::move(seg), std::move(std::get<0>(schema.release()))};
+        }
     });
 }
 
