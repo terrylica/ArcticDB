@@ -9,7 +9,9 @@ As of the Change Date specified in that file, in accordance with the Business So
 import numpy as np
 import pandas as pd
 import polars as pl
+import pytest
 
+from arcticdb.exceptions import SchemaException
 from arcticdb.options import ArrowOutputStringFormat, OutputFormat
 import arcticdb.toolbox.query_stats as qs
 from arcticdb.util.test import assert_frame_equal_with_arrow, config_context
@@ -146,3 +148,18 @@ def test_collect_schema_and_data(s3_library):
         assert "VERSION" not in stats["storage_operations"]["S3_GetObject"]
         assert "TABLE_INDEX" not in stats["storage_operations"]["S3_GetObject"]
         assert_frame_equal_with_arrow(df, received_df)
+
+
+def test_collect_schema_multiindex(lmdb_library):
+    lib = lmdb_library
+    lib._nvs.set_output_format(OutputFormat.POLARS)
+    sym = "test_collect_schema_multiindex"
+    df = pd.DataFrame(
+        {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
+    )
+    lib.write(sym, {"a": df, "b": df}, recursive_normalizers=True)
+
+    lazy_df = lib.read(sym, lazy=True)
+    with pytest.raises(SchemaException) as e:
+        lazy_df.collect_schema()
+    print(e)

@@ -502,6 +502,10 @@ SchemaItem LocalVersionedEngine::read_schema_internal(
             version.has_value(), "Unable to retrieve schema data. {}@{}: version not found", stream_id, version_query
     );
     // TODO: Throw on multiindex here as well
+    schema::check<ErrorCode::E_OPERATION_NOT_SUPPORTED_WITH_RECURSIVE_NORMALIZED_DATA>(
+            version->key_.type() != KeyType::MULTI_KEY,
+            "collect_schema() not supported with recursively normalized data"
+    );
     return get_index(std::move(version->key_), *read_query).get();
 }
 
