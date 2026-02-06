@@ -131,11 +131,11 @@ def test_collect_schema_with_query(lmdb_library):
     assert schema == pl.Schema([("col1", pl.Int64), ("col2", pl.Float32), ("new_col", pl.Int64)])
 
 
-def test_collect_schema_and_data(s3_library):
+def test_collect_schema_and_collect_multiple_times(s3_library):
     with config_context("VersionMap.ReloadInterval", 0):
         lib = s3_library
         lib._nvs.set_output_format(OutputFormat.POLARS)
-        sym = "test_collect_schema_and_data"
+        sym = "test_collect_schema_multiple_times"
         df = pd.DataFrame(
             {"col1": np.arange(10, dtype=np.int64), "col2": np.arange(100, 110, dtype=np.float32)},
         )
@@ -156,6 +156,12 @@ def test_collect_schema_and_data(s3_library):
         assert stats["storage_operations"]["S3_GetObject"]["TABLE_INDEX"]["count"] == 1
         assert "TABLE_DATA" not in stats["storage_operations"]["S3_GetObject"]
         with qs.query_stats():
+            lazy_df.collect_schema()
+            stats = qs.get_query_stats()
+        qs.reset_stats()
+        # Collect again is a no-op as it would produce the same result
+        assert stats == dict()
+        with qs.query_stats():
             received_df = lazy_df.collect().data
             stats = qs.get_query_stats()
         qs.reset_stats()
@@ -164,6 +170,28 @@ def test_collect_schema_and_data(s3_library):
         assert "VERSION_REF" not in stats["storage_operations"]["S3_GetObject"]
         assert "VERSION" not in stats["storage_operations"]["S3_GetObject"]
         assert "TABLE_INDEX" not in stats["storage_operations"]["S3_GetObject"]
+        assert_frame_equal_with_arrow(df, received_df)
+
+        # Change the query
+        lazy_df["new_col"] = lazy_df["col1"] + lazy_df["col2"]
+        with qs.query_stats():
+            lazy_df.collect_schema()
+            stats = qs.get_query_stats()
+        qs.reset_stats()
+        # The query has changed, so we go back to storage
+        assert stats["storage_operations"]["S3_GetObject"]["VERSION_REF"]["count"] == 1
+        assert stats["storage_operations"]["S3_GetObject"]["TABLE_INDEX"]["count"] == 1
+        assert "TABLE_DATA" not in stats["storage_operations"]["S3_GetObject"]
+        with qs.query_stats():
+            received_df = lazy_df.collect().data
+            stats = qs.get_query_stats()
+        qs.reset_stats()
+        # Read the data key, but no vref, version, or index keys
+        assert stats["storage_operations"]["S3_GetObject"]["TABLE_DATA"]["count"] == 1
+        assert "VERSION_REF" not in stats["storage_operations"]["S3_GetObject"]
+        assert "VERSION" not in stats["storage_operations"]["S3_GetObject"]
+        assert "TABLE_INDEX" not in stats["storage_operations"]["S3_GetObject"]
+        df["new_col"] = df["col1"] + df["col2"]
         assert_frame_equal_with_arrow(df, received_df)
 
 
