@@ -2661,7 +2661,7 @@ std::shared_ptr<PipelineContext> setup_pipeline_context(
             }
         } else { // std::holds_alternative<SchemaItem>(version_info)
             pipeline_context->stream_id_ = std::get<std::shared_ptr<SchemaItem>>(version_info)->key_.id();
-            index::IndexSegmentReader isr(std::move(std::get<std::shared_ptr<SchemaItem>>(version_info)->index_seg_));
+            index::IndexSegmentReader isr(std::get<std::shared_ptr<SchemaItem>>(version_info)->index_seg_.clone());
             read_indexed_keys_to_pipeline(pipeline_context, std::move(isr), read_query, read_options);
         }
     }
