@@ -470,7 +470,7 @@ folly::Future<SchemaItem> LocalVersionedEngine::get_index(AtomKey&& k, const Rea
         auto key = to_atom(std::move(key_seg_pair.first));
         auto seg = std::move(key_seg_pair.second);
         const auto& tsd = seg.index_descriptor();
-        OutputSchema schema{tsd.as_stream_descriptor(), tsd.normalization()};
+        OutputSchema schema{tsd.as_stream_descriptor().clone(), tsd.normalization()};
         for (const auto& clause : read_query.clauses_) {
             schema = clause->modify_schema(std::move(schema));
         }

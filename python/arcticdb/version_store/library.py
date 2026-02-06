@@ -520,7 +520,7 @@ class LazyDataFrame(QueryBuilder):
         if self._schema_item is None:
             return self.lib.read(**self._to_read_request()._asdict())
         else:
-            read_request = self.read_request._replace(as_of=self._schema_item)
+            read_request = self._to_read_request()._replace(as_of=self._schema_item)
             return self.lib.read(**read_request._asdict())
 
     def _td_to_pl_type(self, name, td):
