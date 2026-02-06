@@ -2661,6 +2661,8 @@ std::shared_ptr<PipelineContext> setup_pipeline_context(
             }
         } else { // std::holds_alternative<SchemaItem>(version_info)
             pipeline_context->stream_id_ = std::get<std::shared_ptr<SchemaItem>>(version_info)->key_.id();
+            // The SchemaItem should be reusable if collect() is called multiple times on the same lazy dataframe, hence
+            // the clone
             index::IndexSegmentReader isr(std::get<std::shared_ptr<SchemaItem>>(version_info)->index_seg_.clone());
             read_indexed_keys_to_pipeline(pipeline_context, std::move(isr), read_query, read_options);
         }
