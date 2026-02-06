@@ -545,9 +545,9 @@ VersionedItem LocalVersionedEngine::read_modify_write_internal(
     return versioned_item;
 }
 
-folly::Future<DescriptorItem> LocalVersionedEngine::get_descriptor(AtomKey&& k) {
+folly::Future<DescriptorItem> LocalVersionedEngine::get_descriptor(AtomKey&& k, bool include_index_segment = false) {
     const auto key = std::move(k);
-    return store()->read(key).thenValue([](auto&& key_seg_pair) -> DescriptorItem {
+    return store()->read(key).thenValue([include_index_segment](auto&& key_seg_pair) -> DescriptorItem {
         auto key = to_atom(std::move(key_seg_pair.first));
         auto seg = std::move(key_seg_pair.second);
         std::optional<TimeseriesDescriptor> timeseries_descriptor;
@@ -581,7 +581,10 @@ folly::Future<DescriptorItem> LocalVersionedEngine::get_descriptor(AtomKey&& k) 
                     }
             );
         }
-        return DescriptorItem{std::move(key), start_index, end_index, std::move(timeseries_descriptor)};
+        DescriptorItem res{std::move(key), start_index, end_index, std::move(timeseries_descriptor)};
+        if (include_index_segment) {
+            res.index_segment_ = std::move(seg);
+        }
     });
 }
 
@@ -603,7 +606,7 @@ folly::Future<DescriptorItem> LocalVersionedEngine::get_descriptor_async(
 }
 
 DescriptorItem LocalVersionedEngine::read_descriptor_internal(
-        const StreamId& stream_id, const VersionQuery& version_query
+        const StreamId& stream_id, const VersionQuery& version_query, bool include_index_segment
 ) {
     ARCTICDB_SAMPLE(ReadDescriptor, 0)
     auto version = get_version_to_read(stream_id, version_query);
@@ -613,7 +616,7 @@ DescriptorItem LocalVersionedEngine::read_descriptor_internal(
             stream_id,
             version_query
     );
-    return get_descriptor(std::move(version->key_)).get();
+    return get_descriptor(std::move(version->key_), include_index_segment).get();
 }
 
 std::vector<std::variant<DescriptorItem, DataError>> LocalVersionedEngine::batch_read_descriptor_internal(

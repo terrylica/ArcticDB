@@ -172,7 +172,9 @@ class LocalVersionedEngine : public VersionedEngine {
             std::optional<proto::descriptors::UserDefinedMetadata>&& user_meta_proto
     ) override;
 
-    DescriptorItem read_descriptor_internal(const StreamId& stream_id, const VersionQuery& version_query);
+    DescriptorItem read_descriptor_internal(
+            const StreamId& stream_id, const VersionQuery& version_query, bool include_index_segment
+    );
 
     StageResult write_parallel_frame(
             const StreamId& stream_id, const std::shared_ptr<InputFrame>& frame, bool validate_index,

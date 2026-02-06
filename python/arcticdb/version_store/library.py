@@ -47,6 +47,7 @@ from arcticdb_ext.version_store import (
     KeyNotFoundInStageResultInfo,
     InternalArrowOutputStringFormat,
     SchemaItem,
+    PreloadedIndexQuery,
 )
 
 import pandas as pd
@@ -59,7 +60,7 @@ import arcticdb_ext as _ae
 logger = logging.getLogger(__name__)
 
 
-AsOf = Union[int, str, datetime.datetime, SchemaItem]
+AsOf = Union[int, str, datetime.datetime, PreloadedIndexQuery]
 
 
 NORMALIZABLE_TYPES = (pd.DataFrame, pd.Series, np.ndarray)
@@ -482,8 +483,7 @@ class LazyDataFrame(QueryBuilder):
             self._optimisation = read_request.query_builder._optimisation
         self.lib = lib
         self.read_request = read_request._replace(query_builder=None)
-        self._schema_item = None
-        self._collect_schema_read_request = None
+        self._preloaded_index = None
 
     def _to_read_request(self) -> ReadRequest:
         """
@@ -517,71 +517,24 @@ class LazyDataFrame(QueryBuilder):
         VersionedItem
             Object that contains a .data and .metadata element.
         """
-        if self._schema_item is None:
+        if self._preloaded_index is None:
             return self.lib.read(**self._to_read_request()._asdict())
         else:
-            read_request = self._to_read_request()._replace(as_of=self._schema_item)
+            read_request = self._to_read_request()._replace(as_of=self._preloaded_index)
             return self.lib.read(**read_request._asdict())
-
-    def _td_to_pl_type(self, name, td):
-        size_bits = pow(2, td.size_bits + 2)
-        if td.value_type == TypeDescriptor.ValueType.UINT:
-            return getattr(pl, f"UInt{size_bits}")
-        elif td.value_type == TypeDescriptor.ValueType.INT:
-            return getattr(pl, f"Int{size_bits}")
-        elif td.value_type == TypeDescriptor.ValueType.FLOAT:
-            return getattr(pl, f"Float{size_bits}")
-        elif td.value_type == TypeDescriptor.ValueType.BOOL:
-            return pl.Boolean
-        elif td.value_type == TypeDescriptor.ValueType.NANOSECONDS_UTC:
-            return pl.Datetime("ns")
-        elif td.value_type in {
-            TypeDescriptor.ValueType.ASCII_STRING,
-            TypeDescriptor.ValueType.UTF8_STRING,
-            TypeDescriptor.ValueType.DYNAMIC_STRING,
-            TypeDescriptor.ValueType.DYNAMIC_UTF8,
-        }:
-            default_string_type = (
-                arrow_output_string_format_to_internal(
-                    self.read_request.arrow_string_format_default, OutputFormat.POLARS
-                )
-                if self.read_request.arrow_string_format_default is not None
-                else InternalArrowOutputStringFormat.LARGE_STRING
-            )
-            res = (
-                pl.Categorical(["a"])
-                if default_string_type == InternalArrowOutputStringFormat.CATEGORICAL
-                else pl.String
-            )
-            if self.read_request.arrow_string_format_per_column is not None:
-                override = self.read_request.arrow_string_format_per_column.get(name, None)
-                if override is not None:
-                    res = (
-                        pl.Categorical(["a"])
-                        if arrow_output_string_format_to_internal(override, OutputFormat.POLARS)
-                        == InternalArrowOutputStringFormat.CATEGORICAL
-                        else pl.String
-                    )
-            return res
-        else:
-            raise ArcticNativeException(f"Cannot convert type {td} to a Polars type")
 
     # TODO: Add return type
     def collect_schema(self):
-        read_request = self._to_read_request()
-        if read_request != self._collect_schema_read_request:
-            self._schema_item = self.lib._read_schema(
-                symbol=read_request.symbol,
-                as_of=read_request.as_of,
-                columns=read_request.columns,
-                query_builder=read_request.query_builder,
+        if self._preloaded_index is None:
+            dit = self.lib._nvs.get_info(
+                self.read_request.symbol,
+                self.read_request.as_of,
+                iterate_snapshots_if_tombstoned=False,
+                include_index_segment=True,
             )
-            self._collect_schema_read_request = read_request
-        desc = self._schema_item.desc
-        res = []
-        for field in desc.fields:
-            res.append((field.name, self._td_to_pl_type(field.name, field.type_desc)))
-        return pl.Schema(res)
+            self._preloaded_index = PreloadedIndexQuery(dit.key, dit.index_segment)
+        # TODO: Process schema here
+        return None
 
     def __str__(self) -> str:
         query_builder_repr = super().__str__()
@@ -973,21 +926,6 @@ class Library:
             return True
         else:
             return False
-
-    # TODO: Add return type
-    def _read_schema(
-        self,
-        symbol: str,
-        as_of: Optional[AsOf] = None,
-        columns: Optional[List[str]] = None,
-        query_builder: Optional[QueryBuilder] = None,
-    ):
-        return self._nvs._read_schema(
-            symbol=symbol,
-            as_of=as_of,
-            columns=columns,
-            query_builder=query_builder,
-        )
 
     def options(self) -> LibraryOptions:
         """Library options set on this library. See also `enterprise_options`."""

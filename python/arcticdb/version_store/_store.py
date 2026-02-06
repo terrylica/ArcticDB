@@ -60,7 +60,7 @@ from arcticdb_ext.version_store import PythonVersionStoreVersionQuery as _Python
 from arcticdb_ext.version_store import ColumnStats as _ColumnStats
 from arcticdb_ext.version_store import StreamDescriptorMismatch
 from arcticdb_ext.version_store import DataError, KeyNotFoundInStageResultInfo
-from arcticdb_ext.version_store import sorted_value_name
+from arcticdb_ext.version_store import sorted_value_name, PreloadedIndexQuery
 from arcticdb_ext.version_store import ArrowOutputFrame, InternalOutputFormat, MergeAction
 from arcticdb.options import (
     RuntimeOptions,
@@ -260,7 +260,7 @@ def _env_config_from_lib_config(lib_cfg, env):
     return cfg
 
 
-VersionQueryInput = Union[int, str, ExplicitlySupportedDates, None, SchemaItem]
+VersionQueryInput = Union[int, str, ExplicitlySupportedDates, None, PreloadedIndexQuery]
 
 
 def _normalize_dt_range(dtr: DateRangeInput) -> _IndexRange:
@@ -640,25 +640,6 @@ class NativeVersionStore:
 
     def _write_options(self):
         return self._lib_cfg.lib_desc.version.write_options
-
-    # TODO: Add return type
-    def _read_schema(
-        self,
-        symbol,
-        as_of=None,
-        columns=None,
-        query_builder=None,
-    ):
-        # Take a copy as _get_queries can modify the input argument, which makes reusing the input counter-intuitive
-        query_builder = copy.deepcopy(query_builder)
-        version_query, read_options, read_query, _ = self._get_queries(
-            as_of=as_of,
-            date_range=None,
-            row_range=None,
-            columns=columns,
-            query_builder=query_builder,
-        )
-        return self.version_store._read_schema(symbol, version_query, read_options, read_query)
 
     def stage(
         self,
@@ -2064,8 +2045,8 @@ class NativeVersionStore:
             version_query.set_version(as_of, iterate_snapshots_if_tombstoned)
         elif isinstance(as_of, (datetime, Timestamp)):
             version_query.set_timestamp(Timestamp(as_of).value, iterate_snapshots_if_tombstoned)
-        elif isinstance(as_of, SchemaItem):
-            version_query.set_schema_item(as_of)
+        elif isinstance(as_of, PreloadedIndexQuery):
+            version_query.set_preloaded_index(as_of)
         elif as_of is not None:
             raise ArcticNativeException("Unexpected combination of read parameters")
 
@@ -3687,8 +3668,9 @@ class NativeVersionStore:
             - sorted, `str`
         """
         date_range_ns_precision = kwargs.get("date_range_ns_precision", False)
+        include_index_segment = kwargs.get("include_index_segment", False)
         version_query = self._get_version_query(version, **kwargs)
-        dit = self.version_store.read_descriptor(symbol, version_query)
+        dit = self.version_store.read_descriptor(symbol, version_query, include_index_segment)
         return self._process_info(dit, date_range_ns_precision)
 
     def batch_get_info(

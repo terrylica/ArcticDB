@@ -40,6 +40,16 @@ struct SpecificVersionQuery {
     bool iterate_snapshots_if_tombstoned;
 };
 
+struct PreloadedIndexQuery {
+    PreloadedIndexQuery(AtomKey index_key, SegmentInMemory index_seg) :
+        index_key_(std::move(index_key)),
+        index_seg_(std::move(index_seg)) {}
+
+    // Key is just needed for constructing the VersionedItem to return
+    entity::AtomKey index_key_;
+    SegmentInMemory index_seg_;
+};
+
 using VersionQueryType = std::variant<
         std::monostate, // Represents "latest"
         SnapshotVersionQuery, TimestampVersionQuery, SpecificVersionQuery, std::shared_ptr<SchemaItem>>;
