@@ -3640,6 +3640,11 @@ class NativeVersionStore:
             "sorted": sorted_value_name(timeseries_descriptor.sorted),
         }
 
+    def _get_info(self, symbol: str, version: Optional[VersionQueryInput] = None, **kwargs):
+        version_query = self._get_version_query(version, **kwargs)
+        include_index_segment = kwargs.get("include_index_segment", False)
+        return self.version_store.read_descriptor(symbol, version_query, include_index_segment)
+
     def get_info(self, symbol: str, version: Optional[VersionQueryInput] = None, **kwargs) -> Dict[str, Any]:
         """
         Returns descriptive data for `symbol`.
@@ -3667,9 +3672,8 @@ class NativeVersionStore:
             - date_range, `tuple`
             - sorted, `str`
         """
+        dit = self._get_info(symbol, version, **kwargs)
         date_range_ns_precision = kwargs.get("date_range_ns_precision", False)
-        version_query = self._get_version_query(version, **kwargs)
-        dit = self.version_store.read_descriptor(symbol, version_query, False)
         return self._process_info(dit, date_range_ns_precision)
 
     def batch_get_info(

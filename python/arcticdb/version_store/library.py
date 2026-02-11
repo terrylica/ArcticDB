@@ -525,12 +525,13 @@ class LazyDataFrame(QueryBuilder):
     # TODO: Add return type
     def collect_schema(self):
         if self._preloaded_index is None:
-            version_query = self.lib._nvs._get_version_query(
-                self.read_request.as_of, iterate_snapshots_if_tombstoned=False
+            dit = self.lib._nvs._get_info(
+                self.read_request.symbol,
+                self.read_request.as_of,
+                iterate_snapshots_if_tombstoned=False,
+                include_index_segment=True,
             )
-            dit = self.lib._nvs.version_store.read_descriptor(self.read_request.symbol, version_query, True)
             self._preloaded_index = PreloadedIndexQuery(dit.key, dit.index_segment)
-        # TODO: Process schema here
         return None
 
     def __str__(self) -> str:
