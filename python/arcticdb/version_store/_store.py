@@ -3640,6 +3640,19 @@ class NativeVersionStore:
             "sorted": sorted_value_name(timeseries_descriptor.sorted),
         }
 
+    def _modify_schema(
+        self,
+        preloaded_index: PreloadedIndexQuery,
+        columns: Optional[List[str]] = None,
+        query_builder: Optional[QueryBuilder] = None,
+        **kwargs,
+    ):
+        read_options = self._get_read_options_and_output_format(output_format=OutputFormat.POLARS, **kwargs)[0]
+        # Take a copy as _get_read_query can modify the input argument, which makes reusing the input counter-intuitive
+        query_builder = copy.deepcopy(query_builder)
+        read_query = self._get_read_query(date_range=None, row_range=None, columns=columns, query_builder=query_builder)
+        return self.version_store._modify_schema(preloaded_index, read_query, read_options)
+
     def _get_info(self, symbol: str, version: Optional[VersionQueryInput] = None, **kwargs):
         version_query = self._get_version_query(version, **kwargs)
         include_index_segment = kwargs.get("include_index_segment", False)

@@ -862,6 +862,11 @@ void register_bindings(py::module& version, py::exception<arcticdb::ArcticExcept
                  &PythonVersionStore::flush_version_map,
                  py::call_guard<SingleThreadMutexHolder>(),
                  "Flush the version cache")
+            // TODO: Put this somewhere else
+            .def("_modify_schema",
+                 &PythonVersionStore::_modify_schema,
+                 py::call_guard<SingleThreadMutexHolder>(),
+                 "Apply processing operations to a descriptor and return the resulting schema.")
             .def("read_descriptor",
                  &PythonVersionStore::read_descriptor,
                  py::call_guard<SingleThreadMutexHolder>(),

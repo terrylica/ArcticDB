@@ -1378,6 +1378,34 @@ std::vector<std::variant<std::pair<VersionedItem, py::object>, DataError>> Pytho
     return results;
 }
 
+RecordBatchData PythonVersionStore::_modify_schema(
+        const std::shared_ptr<PreloadedIndexQuery>& preloaded_index_query, const std::shared_ptr<ReadQuery>& read_query,
+        const ReadOptions& read_options
+) const {
+    const auto& tsd = preloaded_index_query->index_seg_.index_descriptor();
+    OutputSchema schema{tsd.as_stream_descriptor().clone(), tsd.normalization()};
+    for (const auto& clause : read_query->clauses_) {
+        schema = clause->modify_schema(std::move(schema));
+    }
+    const auto stream_desc = [&]() {
+        if (read_query->columns.has_value()) {
+            ankerl::unordered_dense::set<std::string_view> cols(
+                    read_query->columns->cbegin(), read_query->columns->cend()
+            );
+            StreamDescriptor filtered_desc;
+            for (const auto& field : schema.stream_descriptor().fields()) {
+                if (cols.contains(field.name())) {
+                    filtered_desc.add_field(field);
+                }
+            }
+            return filtered_desc;
+        } else {
+            return std::get<0>(schema.release());
+        }
+    }();
+    return arrow_schema_from_descriptor(stream_desc, read_options.arrow_output_config());
+}
+
 DescriptorItem PythonVersionStore::read_descriptor(
         const StreamId& stream_id, const VersionQuery& version_query, bool include_index_segment
 ) {

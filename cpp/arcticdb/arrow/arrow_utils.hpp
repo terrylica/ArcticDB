@@ -22,8 +22,14 @@ class record_batch;
 
 namespace arcticdb {
 
+namespace entity {
+struct StreamDescriptor;
+}
+
 class SegmentInMemory;
 class Column;
+struct ArrowOutputConfig;
+struct RecordBatchData;
 
 std::vector<sparrow::array> arrow_arrays_from_column(const Column& column, std::string_view name);
 
@@ -34,6 +40,10 @@ std::shared_ptr<std::vector<sparrow::record_batch>> segment_to_arrow_data(Segmen
 std::pair<SegmentInMemory, std::optional<size_t>> arrow_data_to_segment(
         const std::vector<sparrow::record_batch>& record_batches,
         const std::optional<std::string>& index_name = std::nullopt
+);
+
+RecordBatchData arrow_schema_from_descriptor(
+        const entity::StreamDescriptor& stream_desc, const ArrowOutputConfig& arrow_output_config
 );
 
 } // namespace arcticdb
