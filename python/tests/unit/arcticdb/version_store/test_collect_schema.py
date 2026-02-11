@@ -207,4 +207,3 @@ def test_collect_schema_multiindex(lmdb_library):
     lazy_df = lib.read(sym, lazy=True)
     with pytest.raises(SchemaException) as e:
         lazy_df.collect_schema()
-    print(e)

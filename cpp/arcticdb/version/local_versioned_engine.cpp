@@ -466,33 +466,6 @@ ReadVersionWithNodesOutput LocalVersionedEngine::read_dataframe_version_internal
     }
 }
 
-// folly::Future<SchemaItem> LocalVersionedEngine::get_index(AtomKey&& k, const ReadQuery& read_query) {
-//     const auto key = std::move(k);
-//     return store()->read(key).thenValue([&read_query](auto&& key_seg_pair) -> SchemaItem {
-//         auto key = to_atom(std::move(key_seg_pair.first));
-//         auto seg = std::move(key_seg_pair.second);
-//         const auto& tsd = seg.index_descriptor();
-//         OutputSchema schema{tsd.as_stream_descriptor().clone(), tsd.normalization()};
-//         for (const auto& clause : read_query.clauses_) {
-//             schema = clause->modify_schema(std::move(schema));
-//         }
-//         if (read_query.columns.has_value()) {
-//             ankerl::unordered_dense::set<std::string_view> cols(
-//                     read_query.columns->cbegin(), read_query.columns->cend()
-//             );
-//             StreamDescriptor filtered_desc;
-//             for (const auto& field : schema.stream_descriptor().fields()) {
-//                 if (cols.contains(field.name())) {
-//                     filtered_desc.add_field(field);
-//                 }
-//             }
-//             return SchemaItem{std::move(key), std::move(seg), std::move(filtered_desc)};
-//         } else {
-//             return SchemaItem{std::move(key), std::move(seg), std::move(std::get<0>(schema.release()))};
-//         }
-//     });
-// }
-
 VersionedItem LocalVersionedEngine::read_modify_write_internal(
         const StreamId& source_stream, const StreamId& target_stream, const VersionQuery& version_query,
         const std::shared_ptr<ReadQuery>& read_query, const ReadOptions& read_options, bool prune_previous_versions,

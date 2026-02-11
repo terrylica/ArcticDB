@@ -1382,6 +1382,10 @@ RecordBatchData PythonVersionStore::_modify_schema(
         const std::shared_ptr<PreloadedIndexQuery>& preloaded_index_query, const std::shared_ptr<ReadQuery>& read_query,
         const ReadOptions& read_options
 ) const {
+    schema::check<ErrorCode::E_OPERATION_NOT_SUPPORTED_WITH_RECURSIVE_NORMALIZED_DATA>(
+            preloaded_index_query->index_key_.type() == KeyType::TABLE_INDEX,
+            "collect_schema() not supported with recursively normalized data"
+    );
     const auto& tsd = preloaded_index_query->index_seg_.index_descriptor();
     OutputSchema schema{tsd.as_stream_descriptor().clone(), tsd.normalization()};
     for (const auto& clause : read_query->clauses_) {
