@@ -524,14 +524,17 @@ class LazyDataFrame(QueryBuilder):
 
     # TODO: Add return type
     def collect_schema(self):
-        if self._preloaded_index is None:
-            dit = self.lib._nvs._get_info(
-                self.read_request.symbol,
-                self.read_request.as_of,
-                iterate_snapshots_if_tombstoned=False,
-                include_index_segment=True,
-            )
-            self._preloaded_index = PreloadedIndexQuery(dit.key, dit.index_segment)
+        # Considered wrapping this in an if self._preloaded_index is None statement, but this could then give
+        # non-intuitive results when using as_of snapshots that are changing or negative integers when new versions
+        # are being created, so to be on the safe side we will always return to storage, even though the result will
+        # probably be the same when collect_schema is called multiple times
+        dit = self.lib._nvs._get_info(
+            self.read_request.symbol,
+            self.read_request.as_of,
+            iterate_snapshots_if_tombstoned=False,
+            include_index_segment=True,
+        )
+        self._preloaded_index = PreloadedIndexQuery(dit.key, dit.index_segment)
         read_request = self._to_read_request()
         record_batch = self.lib._nvs._modify_schema(
             self._preloaded_index,

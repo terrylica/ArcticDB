@@ -159,8 +159,10 @@ def test_collect_schema_and_collect_multiple_times(s3_library):
             lazy_df.collect_schema()
             stats = qs.get_query_stats()
         qs.reset_stats()
-        # Collect again is a no-op as it would produce the same result
-        assert stats == dict()
+        # Read the same keys again, see comment in collect_schema() impl for explanation of why
+        assert stats["storage_operations"]["S3_GetObject"]["VERSION_REF"]["count"] == 1
+        assert stats["storage_operations"]["S3_GetObject"]["TABLE_INDEX"]["count"] == 1
+        assert "TABLE_DATA" not in stats["storage_operations"]["S3_GetObject"]
         with qs.query_stats():
             received_df = lazy_df.collect().data
             stats = qs.get_query_stats()
@@ -178,7 +180,7 @@ def test_collect_schema_and_collect_multiple_times(s3_library):
             lazy_df.collect_schema()
             stats = qs.get_query_stats()
         qs.reset_stats()
-        # The query has changed, so we go back to storage
+        # Read the same keys again, see comment in collect_schema() impl for explanation of why
         assert stats["storage_operations"]["S3_GetObject"]["VERSION_REF"]["count"] == 1
         assert stats["storage_operations"]["S3_GetObject"]["TABLE_INDEX"]["count"] == 1
         assert "TABLE_DATA" not in stats["storage_operations"]["S3_GetObject"]
