@@ -42,7 +42,7 @@ void StreamVersionData::do_react(const pipelines::SnapshotVersionQuery& snapshot
     snapshots_.push_back(snapshot_query.name_);
 }
 
-void StreamVersionData::do_react(ARCTICDB_UNUSED const std::shared_ptr<SchemaItem>& schema_item) {
+void StreamVersionData::do_react(const std::shared_ptr<PreloadedIndexQuery>&) {
     util::raise_rte("collect_schema() note yet supported with batch methods");
 }
 

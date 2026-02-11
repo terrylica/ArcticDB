@@ -187,14 +187,15 @@ void register_bindings(py::module& version, py::exception<arcticdb::ArcticExcept
             }))
             .def(py::init([](py::array value_list) { return std::make_shared<ValueSet>(value_list); }));
 
-    py::class_<PreloadedIndexQuery>(version, "PreloadedIndexQuery").def(py::init<AtomKey, SegmentInMemory>());
+    py::class_<PreloadedIndexQuery, std::shared_ptr<PreloadedIndexQuery>>(version, "PreloadedIndexQuery")
+            .def(py::init<AtomKey, SegmentInMemory>());
 
     py::class_<VersionQuery>(version, "PythonVersionStoreVersionQuery")
             .def(py::init())
             .def("set_snap_name", &VersionQuery::set_snap_name)
             .def("set_timestamp", &VersionQuery::set_timestamp)
             .def("set_version", &VersionQuery::set_version)
-            .def("set_schema_item", &VersionQuery::set_schema_item);
+            .def("set_preloaded_index", &VersionQuery::set_preloaded_index);
 
     py::enum_<OutputFormat>(version, "InternalOutputFormat")
             .value("PANDAS", OutputFormat::PANDAS)

@@ -32,7 +32,7 @@ import time
 from arcticdb.dependencies import pyarrow as pa
 from arcticdb.dependencies import polars as pl
 from arcticc.pb2.descriptors_pb2 import IndexDescriptor, TypeDescriptor
-from arcticdb_ext.version_store import RecordBatchData, SortedValue, StageResult, SchemaItem
+from arcticdb_ext.version_store import RecordBatchData, SortedValue, StageResult
 from arcticc.pb2.storage_pb2 import LibraryConfig, EnvironmentConfigsMap
 from arcticdb.preconditions import check
 from arcticdb.supported_types import DateRangeInput, ExplicitlySupportedDates
@@ -3668,9 +3668,8 @@ class NativeVersionStore:
             - sorted, `str`
         """
         date_range_ns_precision = kwargs.get("date_range_ns_precision", False)
-        include_index_segment = kwargs.get("include_index_segment", False)
         version_query = self._get_version_query(version, **kwargs)
-        dit = self.version_store.read_descriptor(symbol, version_query, include_index_segment)
+        dit = self.version_store.read_descriptor(symbol, version_query, False)
         return self._process_info(dit, date_range_ns_precision)
 
     def batch_get_info(

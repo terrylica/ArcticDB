@@ -1058,13 +1058,6 @@ ReadResult PythonVersionStore::read_dataframe_version(
     );
 }
 
-SchemaItem PythonVersionStore::read_schema(
-        const StreamId& stream_id, const VersionQuery& version_query, const ReadOptions& read_options,
-        const std::shared_ptr<ReadQuery>& read_query
-) {
-    return read_schema_internal(stream_id, version_query, read_options, read_query);
-}
-
 VersionedItem PythonVersionStore::read_modify_write(
         const StreamId& source_stream, const StreamId& target_stream, const py::object& user_meta,
         const VersionQuery& version_query, const std::shared_ptr<ReadQuery>& read_query,

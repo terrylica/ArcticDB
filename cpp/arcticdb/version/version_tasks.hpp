@@ -11,13 +11,14 @@
 #include <arcticdb/async/base_task.hpp>
 #include <arcticdb/pipeline/read_frame.hpp>
 #include <arcticdb/pipeline/index_utils.hpp>
+#include <arcticdb/pipeline/query.hpp>
 #include <arcticdb/version/version_store_objects.hpp>
 #include <arcticdb/version/version_map.hpp>
 #include <arcticdb/util/key_utils.hpp>
 
 namespace arcticdb {
 
-using VersionIdentifier = std::variant<VersionedItem, StreamId, std::shared_ptr<SchemaItem>>;
+using VersionIdentifier = std::variant<VersionedItem, StreamId, std::shared_ptr<pipelines::PreloadedIndexQuery>>;
 
 struct UpdateMetadataTask : async::BaseTask {
     const std::shared_ptr<Store> store_;

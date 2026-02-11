@@ -2659,11 +2659,14 @@ std::shared_ptr<PipelineContext> setup_pipeline_context(
             if (maybe_isr.has_value()) {
                 read_indexed_keys_to_pipeline(pipeline_context, std::move(*maybe_isr), read_query, read_options);
             }
-        } else { // std::holds_alternative<SchemaItem>(version_info)
-            pipeline_context->stream_id_ = std::get<std::shared_ptr<SchemaItem>>(version_info)->key_.id();
-            // The SchemaItem should be reusable if collect() is called multiple times on the same lazy dataframe, hence
-            // the clone
-            index::IndexSegmentReader isr(std::get<std::shared_ptr<SchemaItem>>(version_info)->index_seg_.clone());
+        } else { // std::holds_alternative<std::shared_ptr<PreloadedIndexQuery>>(version_info)
+            pipeline_context->stream_id_ =
+                    std::get<std::shared_ptr<PreloadedIndexQuery>>(version_info)->index_key_.id();
+            // The PreloadedIndexQuery should be reusable if collect() is called multiple times on the same lazy
+            // dataframe, hence the clone
+            index::IndexSegmentReader isr(
+                    std::get<std::shared_ptr<PreloadedIndexQuery>>(version_info)->index_seg_.clone()
+            );
             read_indexed_keys_to_pipeline(pipeline_context, std::move(isr), read_query, read_options);
         }
     }
@@ -2714,8 +2717,8 @@ VersionedItem generate_result_versioned_item(const VersionIdentifier& version_in
                                                .build<KeyType::TABLE_INDEX>(std::get<StreamId>(version_info)));
     } else if (std::holds_alternative<VersionedItem>(version_info)) {
         versioned_item = std::get<VersionedItem>(version_info);
-    } else { // std::holds_alternative<std::shared_ptr<SchemaItem>>(version_info)
-        versioned_item = std::get<std::shared_ptr<SchemaItem>>(version_info)->key_;
+    } else { // std::holds_alternative<std::shared_ptr<PreloadedIndexQuery>>(version_info)
+        versioned_item = std::get<std::shared_ptr<PreloadedIndexQuery>>(version_info)->index_key_;
     }
     return versioned_item;
 }

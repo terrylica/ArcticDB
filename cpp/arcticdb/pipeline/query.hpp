@@ -10,7 +10,6 @@
 
 #include <arcticdb/util/bitset.hpp>
 #include <arcticdb/entity/index_range.hpp>
-#include <arcticdb/entity/schema_item.hpp>
 #include <arcticdb/pipeline/frame_slice.hpp>
 #include <arcticdb/util/variant.hpp>
 #include <arcticdb/pipeline/index_segment_reader.hpp>
@@ -52,7 +51,7 @@ struct PreloadedIndexQuery {
 
 using VersionQueryType = std::variant<
         std::monostate, // Represents "latest"
-        SnapshotVersionQuery, TimestampVersionQuery, SpecificVersionQuery, std::shared_ptr<SchemaItem>>;
+        SnapshotVersionQuery, TimestampVersionQuery, SpecificVersionQuery, std::shared_ptr<PreloadedIndexQuery>>;
 
 struct VersionQuery {
     VersionQueryType content_;
@@ -67,7 +66,9 @@ struct VersionQuery {
         content_ = SpecificVersionQuery{version, iterate_snapshots_if_tombstoned};
     }
 
-    void set_schema_item(std::shared_ptr<SchemaItem> schema_item) { content_ = schema_item; }
+    void set_preloaded_index(std::shared_ptr<PreloadedIndexQuery> preloaded_index_query) {
+        content_ = preloaded_index_query;
+    }
 };
 
 template<typename ContainerType>
@@ -441,8 +442,8 @@ struct formatter<VersionQuery> {
                 },
                 [&ctx](const SnapshotVersionQuery& s) { return fmt::format_to(ctx.out(), "snapshot '{}'", s.name_); },
                 [&ctx](const TimestampVersionQuery& t) { return fmt::format_to(ctx.out(), "{}", t.timestamp_); },
-                [&ctx](const std::shared_ptr<arcticdb::SchemaItem>& s) {
-                    return fmt::format_to(ctx.out(), "SchemaItem({})", s->key_);
+                [&ctx](const std::shared_ptr<arcticdb::PreloadedIndexQuery>& p) {
+                    return fmt::format_to(ctx.out(), "PreloadedIndexQuery({})", p->index_key_);
                 },
                 [&ctx](const std::monostate&) { return fmt::format_to(ctx.out(), "latest"); }
         );

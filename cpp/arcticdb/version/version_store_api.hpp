@@ -124,11 +124,6 @@ class PythonVersionStore : public LocalVersionedEngine {
             const ReadOptions& read_options, std::any& handler_data
     );
 
-    SchemaItem read_schema(
-            const StreamId& stream_id, const VersionQuery& version_query, const ReadOptions& read_options,
-            const std::shared_ptr<ReadQuery>& read_query
-    );
-
     VersionedItem read_modify_write(
             const StreamId& stream_id, const StreamId& target_stream, const py::object& user_meta,
             const VersionQuery& version_query, const std::shared_ptr<ReadQuery>& read_query,
